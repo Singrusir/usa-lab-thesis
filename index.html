@@ -1094,12 +1094,13 @@
     const res = await fetch(`${baseUrl}/api/external/conversations/${convId}/run`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ content: message })   // ← 正確欄位名稱 content
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(`執行失敗 (${res.status}): ${err.message || err.error || res.statusText}`);
+      const detail = err.detail ? JSON.stringify(err.detail) : (err.message || err.error || res.statusText);
+      throw new Error(`執行失敗 (${res.status}): ${detail}`);
     }
 
     const data = await res.json();
@@ -1108,10 +1109,10 @@
 
   async function pollTaskUntilDone(baseUrl, apiKey, taskId, onProgress) {
     const start = Date.now();
-    const TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    const TIMEOUT = 8 * 60 * 1000; // 8 minutes (論文產製需要較長時間)
     while (true) {
-      if (Date.now() - start > TIMEOUT) throw new Error('產製逾時（5 分鐘），請稍後再試');
-      await sleep(3000);
+      if (Date.now() - start > TIMEOUT) throw new Error('產製逾時（8 分鐘），請稍後再試');
+      await sleep(4000);
 
       const res = await fetch(`${baseUrl}/api/external/tasks/${taskId}`, {
         headers: { 'Authorization': `Bearer ${apiKey}` }
@@ -1126,7 +1127,11 @@
     }
   }
 
-  async function getLatestAssistantMessage(baseUrl, apiKey, convId) {
+  async function getLatestAssistantMessage(baseUrl, apiKey, convId, task) {
+    // 優先從 task.result 取得（API 直接返回，更快）
+    if (task && task.result) return task.result;
+
+    // Fallback: 從 messages 端點取得
     const res = await fetch(`${baseUrl}/api/external/conversations/${convId}/messages`, {
       headers: { 'Authorization': `Bearer ${apiKey}` }
     });
@@ -1246,12 +1251,12 @@
           const taskId = await runOmniTask(baseUrl, apiKey, convId, prompt);
 
           logEl.textContent = `Task ${taskId} 執行中，等待完成…`;
-          await pollTaskUntilDone(baseUrl, apiKey, taskId, task => {
+          const completedTask = await pollTaskUntilDone(baseUrl, apiKey, taskId, task => {
             logEl.textContent = `Task ${taskId} · 狀態: ${task.status}`;
           });
 
           logEl.textContent = '擷取 AI 回應…';
-          const content = await getLatestAssistantMessage(baseUrl, apiKey, convId);
+          const content = await getLatestAssistantMessage(baseUrl, apiKey, convId, completedTask);
 
           phaseTimers.forEach(t => clearTimeout(t));
           for (let p = 0; p < 5; p++) {
