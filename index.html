@@ -874,6 +874,14 @@
       alert.classList.add('visible');
     }
   }
+  /* ── Auto-configure on first load ───────────────── */
+  (function autoConfig() {
+    const DEFAULT_URL = 'https://321b57ea43ba02.lhr.life';
+    const DEFAULT_KEY = 'omni_98c22d8b33baf1e9c583a09a109b2428e8063189744aa272';
+    if (!localStorage.getItem('omni_base_url')) localStorage.setItem('omni_base_url', DEFAULT_URL);
+    if (!localStorage.getItem('omni_api_key'))  localStorage.setItem('omni_api_key',  DEFAULT_KEY);
+  })();
+
   refreshIndicator();
 
   /* ── Settings modal ─────────────────────────────── */
